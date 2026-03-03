@@ -7,6 +7,7 @@ import {
   getExpenses,
   updateExpense,
 } from "../api/expenses";
+import "./dashboard.css";
 
 const today = new Date();
 const currentMonth = today.getMonth() + 1;
@@ -93,10 +94,7 @@ function Dashboard() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState("");
 
-  const total = useMemo(
-    () => sumExpenseAmounts(expenses),
-    [expenses]
-  );
+  const total = useMemo(() => sumExpenseAmounts(expenses), [expenses]);
 
   const monthlyBudgetValue = Number(budget?.monthlyBudget);
   const dailyBudgetValue = Number(budget?.dailyBudget);
@@ -104,8 +102,8 @@ function Dashboard() {
   const hasValidDailyBudget = Number.isFinite(dailyBudgetValue) && dailyBudgetValue >= 0;
   const remainingBudget = hasValidBudget ? monthlyBudgetValue - monthlySpent : null;
   const utilization = hasValidBudget ? (monthlySpent / monthlyBudgetValue) * 100 : null;
-  const utilizationColor =
-    utilization >= 100 ? "crimson" : utilization >= 80 ? "darkorange" : "green";
+  const utilizationTone =
+    utilization >= 100 ? "tone-danger" : utilization >= 80 ? "tone-warning" : "tone-good";
 
   const todayDayOfMonth = today.getDate();
   const expectedTillToday =
@@ -118,14 +116,14 @@ function Dashboard() {
     expectedTillToday !== null && actualTillToday !== null
       ? expectedTillToday - actualTillToday
       : null;
-  const deltaColor =
+  const deltaTone =
     deltaTillToday === null
-      ? "inherit"
+      ? ""
       : deltaTillToday > 0
-        ? "green"
+        ? "tone-good"
         : deltaTillToday < 0
-          ? "crimson"
-          : "darkorange";
+          ? "tone-danger"
+          : "tone-warning";
   const formattedDelta =
     deltaTillToday === null
       ? "-"
@@ -156,37 +154,6 @@ function Dashboard() {
       console.error(err);
     } finally {
       setExpenseLoading(false);
-    }
-  };
-
-  const loadCurrentBudget = async () => {
-    try {
-      setBudgetLoading(true);
-      setBudgetError("");
-      const res = await getCurrentBudget();
-      setBudget(res.data ?? null);
-      if (res.data) {
-        setInsightsError("");
-        setBudgetForm({
-          monthlyIncome: res.data.monthlyIncome ?? "",
-          totalEmi: res.data.totalEmi ?? "",
-          monthlySavings: res.data.monthlySavings ?? "",
-          month: res.data.month ?? currentMonth,
-          year: res.data.year ?? currentYear,
-        });
-        await loadMonthlySpent(res.data.month, res.data.year);
-      }
-    } catch (err) {
-      if (err.response?.status === 404) {
-        setBudget(null);
-        setMonthlySpent(0);
-        setInsightsError("");
-      } else {
-        setBudgetError(getErrorText("Unable to load current budget", err));
-      }
-      console.error(err);
-    } finally {
-      setBudgetLoading(false);
     }
   };
 
@@ -231,6 +198,37 @@ function Dashboard() {
       console.error(err);
     } finally {
       setInsightsLoading(false);
+    }
+  };
+
+  const loadCurrentBudget = async () => {
+    try {
+      setBudgetLoading(true);
+      setBudgetError("");
+      const res = await getCurrentBudget();
+      setBudget(res.data ?? null);
+      if (res.data) {
+        setInsightsError("");
+        setBudgetForm({
+          monthlyIncome: res.data.monthlyIncome ?? "",
+          totalEmi: res.data.totalEmi ?? "",
+          monthlySavings: res.data.monthlySavings ?? "",
+          month: res.data.month ?? currentMonth,
+          year: res.data.year ?? currentYear,
+        });
+        await loadMonthlySpent(res.data.month, res.data.year);
+      }
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setBudget(null);
+        setMonthlySpent(0);
+        setInsightsError("");
+      } else {
+        setBudgetError(getErrorText("Unable to load current budget", err));
+      }
+      console.error(err);
+    } finally {
+      setBudgetLoading(false);
     }
   };
 
@@ -350,7 +348,8 @@ function Dashboard() {
       setExpenseError("");
       await deleteExpense(expenseId);
 
-      const nextPage = expenses.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage;
+      const nextPage =
+        expenses.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage;
       await loadExpenses(nextPage, expenseFilters);
       if (budget) {
         await loadMonthlySpent(budget.month, budget.year);
@@ -417,348 +416,392 @@ function Dashboard() {
   };
 
   return (
-    <div style={{ padding: 40, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Expense Dashboard</h1>
-
-      <div style={{ marginBottom: 24 }}>
-        <button onClick={logout}>Logout</button>
-      </div>
-
-      <section style={{ marginBottom: 32 }}>
-        <h2>Monthly Budget</h2>
-
-        <form onSubmit={onSaveBudget} style={{ marginBottom: 16 }}>
-          <input
-            name="monthlyIncome"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Monthly Income"
-            value={budgetForm.monthlyIncome}
-            onChange={onBudgetChange}
-            required
-          />
-          <br />
-          <br />
-          <input
-            name="totalEmi"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Total EMI"
-            value={budgetForm.totalEmi}
-            onChange={onBudgetChange}
-            required
-          />
-          <br />
-          <br />
-          <input
-            name="monthlySavings"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Monthly Savings"
-            value={budgetForm.monthlySavings}
-            onChange={onBudgetChange}
-            required
-          />
-          <br />
-          <br />
-          <input
-            name="month"
-            type="number"
-            min="1"
-            max="12"
-            placeholder="Month"
-            value={budgetForm.month}
-            onChange={onBudgetChange}
-            required
-          />
-          <br />
-          <br />
-          <input
-            name="year"
-            type="number"
-            min="2000"
-            placeholder="Year"
-            value={budgetForm.year}
-            onChange={onBudgetChange}
-            required
-          />
-          <br />
-          <br />
-          <button type="submit" disabled={budgetSubmitting}>
-            {budgetSubmitting ? "Saving..." : "Save Budget"}
-          </button>
-        </form>
-
-        {budgetError ? <p style={{ color: "crimson" }}>{budgetError}</p> : null}
-
-        {budgetLoading ? <p>Loading current budget...</p> : null}
-        {!budgetLoading && budget ? (
-          <div>
-            <p>
-              Current Month Budget: <strong>{budget.monthlyBudget}</strong>
-            </p>
-            <p>
-              Daily Budget: <strong>{budget.dailyBudget}</strong>
-            </p>
-            <p>
-              Period:{" "}
-              <strong>
-                {budget.month}/{budget.year}
-              </strong>
-            </p>
-
-            {insightsLoading ? <p>Updating spending insights...</p> : null}
-            {insightsError ? <p style={{ color: "crimson" }}>{insightsError}</p> : null}
-            {!insightsLoading && !insightsError ? (
-              <>
-                <p>
-                  Spent This Month: <strong>{monthlySpent.toFixed(2)}</strong>
-                </p>
-                <p>
-                  Remaining Budget:{" "}
-                  <strong>{remainingBudget !== null ? remainingBudget.toFixed(2) : "-"}</strong>
-                </p>
-                <p style={{ color: utilizationColor }}>
-                  Utilization:{" "}
-                  <strong>{utilization !== null ? `${utilization.toFixed(2)}%` : "-"}</strong>
-                </p>
-                <p>
-                  Expected Spend Till Day {todayDayOfMonth}:{" "}
-                  <strong>{expectedTillToday !== null ? expectedTillToday.toFixed(2) : "-"}</strong>
-                </p>
-                <p>
-                  Actual Spend Till Today:{" "}
-                  <strong>{actualTillToday !== null ? actualTillToday.toFixed(2) : "-"}</strong>
-                </p>
-                <p style={{ color: deltaColor }}>
-                  Today&apos;s Budget Delta: <strong>{formattedDelta}</strong>
-                </p>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-        {!budgetLoading && !budget ? <p>No budget set for current month.</p> : null}
-      </section>
-
-      <section style={{ marginBottom: 32 }}>
-        <h2>Add Expense</h2>
-        <form onSubmit={onCreateExpense}>
-          <input
-            name="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Amount"
-            value={expenseForm.amount}
-            onChange={onExpenseChange}
-            required
-          />
-          <br />
-          <br />
-          <input
-            name="category"
-            placeholder="Category (e.g. Food)"
-            value={expenseForm.category}
-            onChange={onExpenseChange}
-          />
-          <br />
-          <br />
-          <input
-            name="description"
-            placeholder="Description"
-            value={expenseForm.description}
-            onChange={onExpenseChange}
-          />
-          <br />
-          <br />
-          <input
-            name="expenseDate"
-            type="date"
-            value={expenseForm.expenseDate}
-            onChange={onExpenseChange}
-            required
-          />
-          <br />
-          <br />
-          <button type="submit" disabled={expenseSubmitting}>
-            {expenseSubmitting ? "Saving..." : "Save Expense"}
-          </button>
-        </form>
-        {expenseError ? <p style={{ color: "crimson" }}>{expenseError}</p> : null}
-      </section>
-
-      <section>
-        <h2>Your Expenses</h2>
-
-        <form onSubmit={onApplyExpenseFilters} style={{ marginBottom: 16 }}>
-          <input
-            name="category"
-            placeholder="Filter by category"
-            value={expenseFilters.category}
-            onChange={onExpenseFilterChange}
-          />
-          <br />
-          <br />
-          <input
-            name="month"
-            type="number"
-            min="1"
-            max="12"
-            placeholder="Month (1-12)"
-            value={expenseFilters.month}
-            onChange={onExpenseFilterChange}
-          />
-          <br />
-          <br />
-          <input
-            name="year"
-            type="number"
-            min="2000"
-            placeholder="Year"
-            value={expenseFilters.year}
-            onChange={onExpenseFilterChange}
-          />
-          <br />
-          <br />
-          <button type="submit">Apply Filters</button>{" "}
-          <button type="button" onClick={onClearExpenseFilters}>
-            Clear Filters
-          </button>
-        </form>
-
-        {expenseLoading ? <p>Loading expenses...</p> : null}
-        {!expenseLoading && expenses.length === 0 ? <p>No expenses found for current criteria.</p> : null}
-        {!expenseLoading && expenses.length > 0 ? (
-          <>
-            <p>
-              Page Total: <strong>{total.toFixed(2)}</strong>
-            </p>
-            <p>
-              Records: <strong>{totalElements}</strong>
-            </p>
-            <table border="1" cellPadding="8" cellSpacing="0">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Description</th>
-                  <th>Amount</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => {
-                  const isEditing = editingExpenseId === expense.id;
-                  return (
-                    <tr key={expense.id}>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            name="expenseDate"
-                            type="date"
-                            value={editExpenseForm.expenseDate}
-                            onChange={onEditExpenseChange}
-                          />
-                        ) : (
-                          expense.expenseDate
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            name="category"
-                            value={editExpenseForm.category}
-                            onChange={onEditExpenseChange}
-                          />
-                        ) : (
-                          expense.category || "-"
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            name="description"
-                            value={editExpenseForm.description}
-                            onChange={onEditExpenseChange}
-                          />
-                        ) : (
-                          expense.description || "-"
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            name="amount"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={editExpenseForm.amount}
-                            onChange={onEditExpenseChange}
-                          />
-                        ) : (
-                          expense.amount
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <>
-                            <button
-                              type="button"
-                              disabled={isUpdatingExpense}
-                              onClick={() => onSaveExpenseEdit(expense.id)}
-                            >
-                              {isUpdatingExpense ? "Saving..." : "Save"}
-                            </button>{" "}
-                            <button type="button" onClick={onCancelExpenseEdit}>
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" onClick={() => onStartExpenseEdit(expense)}>
-                              Edit
-                            </button>{" "}
-                            <button
-                              type="button"
-                              disabled={deletingExpenseId === expense.id}
-                              onClick={() => onDeleteExpense(expense.id)}
-                            >
-                              {deletingExpenseId === expense.id ? "Deleting..." : "Delete"}
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <div style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                disabled={expenseLoading || currentPage <= 0}
-                onClick={() => onChangePage(currentPage - 1)}
-              >
-                Previous
-              </button>{" "}
-              <span>
-                Page {currentPage + 1} of {totalPages}
-              </span>{" "}
-              <button
-                type="button"
-                disabled={expenseLoading || currentPage >= totalPages - 1}
-                onClick={() => onChangePage(currentPage + 1)}
-              >
-                Next
-              </button>
+    <div className="dashboard-page">
+      <div className="dashboard-shell">
+        <header className="dash-head">
+          <div className="dash-brand">
+            <div className="dash-logo">E</div>
+            <div>
+              <p className="dash-brand-name">Expensave</p>
+              <p className="dash-brand-tag">Track smarter. Save better.</p>
             </div>
-          </>
-        ) : null}
-      </section>
+          </div>
+          <button className="dash-btn dash-btn-ghost" onClick={logout}>
+            Logout
+          </button>
+        </header>
+
+        <div className="dash-grid">
+          <section className="dash-card">
+            <div className="dash-card-head">
+              <h2 className="dash-card-title">Monthly Budget</h2>
+              <p className="dash-card-subtitle">Set your month target in one place.</p>
+            </div>
+
+            <form className="dash-form-grid" onSubmit={onSaveBudget}>
+              <input
+                className="dash-input"
+                name="monthlyIncome"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Monthly Income"
+                value={budgetForm.monthlyIncome}
+                onChange={onBudgetChange}
+                required
+              />
+              <input
+                className="dash-input"
+                name="totalEmi"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Total EMI"
+                value={budgetForm.totalEmi}
+                onChange={onBudgetChange}
+                required
+              />
+              <input
+                className="dash-input"
+                name="monthlySavings"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Monthly Savings"
+                value={budgetForm.monthlySavings}
+                onChange={onBudgetChange}
+                required
+              />
+              <input
+                className="dash-input"
+                name="month"
+                type="number"
+                min="1"
+                max="12"
+                placeholder="Month"
+                value={budgetForm.month}
+                onChange={onBudgetChange}
+                required
+              />
+              <input
+                className="dash-input"
+                name="year"
+                type="number"
+                min="2000"
+                placeholder="Year"
+                value={budgetForm.year}
+                onChange={onBudgetChange}
+                required
+              />
+              <button className="dash-btn dash-btn-primary" type="submit" disabled={budgetSubmitting}>
+                {budgetSubmitting ? "Saving..." : "Save Budget"}
+              </button>
+            </form>
+
+            {budgetError ? <p className="dash-msg dash-msg-error">{budgetError}</p> : null}
+            {budgetLoading ? <p className="dash-msg">Loading current budget...</p> : null}
+
+            {!budgetLoading && budget ? (
+              <div className="dash-stats-grid">
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Monthly Budget</p>
+                  <p className="dash-stat-value">{budget.monthlyBudget}</p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Daily Budget</p>
+                  <p className="dash-stat-value">{budget.dailyBudget}</p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Period</p>
+                  <p className="dash-stat-value">
+                    {budget.month}/{budget.year}
+                  </p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Spent This Month</p>
+                  <p className="dash-stat-value">{monthlySpent.toFixed(2)}</p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Remaining Budget</p>
+                  <p className="dash-stat-value">
+                    {remainingBudget !== null ? remainingBudget.toFixed(2) : "-"}
+                  </p>
+                </article>
+                <article className={`dash-stat ${utilizationTone}`}>
+                  <p className="dash-stat-label">Utilization</p>
+                  <p className="dash-stat-value">
+                    {utilization !== null ? `${utilization.toFixed(2)}%` : "-"}
+                  </p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Expected Till Day {todayDayOfMonth}</p>
+                  <p className="dash-stat-value">
+                    {expectedTillToday !== null ? expectedTillToday.toFixed(2) : "-"}
+                  </p>
+                </article>
+                <article className="dash-stat">
+                  <p className="dash-stat-label">Actual Till Today</p>
+                  <p className="dash-stat-value">
+                    {actualTillToday !== null ? actualTillToday.toFixed(2) : "-"}
+                  </p>
+                </article>
+                <article className={`dash-stat ${deltaTone}`}>
+                  <p className="dash-stat-label">Today&apos;s Delta</p>
+                  <p className="dash-stat-value">{formattedDelta}</p>
+                </article>
+              </div>
+            ) : null}
+
+            {insightsLoading ? <p className="dash-msg">Updating spending insights...</p> : null}
+            {insightsError ? <p className="dash-msg dash-msg-error">{insightsError}</p> : null}
+            {!budgetLoading && !budget ? <p className="dash-msg">No budget set for current month.</p> : null}
+          </section>
+
+          <section className="dash-card">
+            <div className="dash-card-head">
+              <h2 className="dash-card-title">Add Expense</h2>
+              <p className="dash-card-subtitle">Capture every spend instantly.</p>
+            </div>
+            <form className="dash-form-grid" onSubmit={onCreateExpense}>
+              <input
+                className="dash-input"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount"
+                value={expenseForm.amount}
+                onChange={onExpenseChange}
+                required
+              />
+              <input
+                className="dash-input"
+                name="category"
+                placeholder="Category (e.g. Food)"
+                value={expenseForm.category}
+                onChange={onExpenseChange}
+              />
+              <input
+                className="dash-input"
+                name="description"
+                placeholder="Description"
+                value={expenseForm.description}
+                onChange={onExpenseChange}
+              />
+              <input
+                className="dash-input"
+                name="expenseDate"
+                type="date"
+                value={expenseForm.expenseDate}
+                onChange={onExpenseChange}
+                required
+              />
+              <button className="dash-btn dash-btn-primary" type="submit" disabled={expenseSubmitting}>
+                {expenseSubmitting ? "Saving..." : "Save Expense"}
+              </button>
+            </form>
+            {expenseError ? <p className="dash-msg dash-msg-error">{expenseError}</p> : null}
+          </section>
+        </div>
+
+        <section className="dash-card dash-card-wide">
+          <div className="dash-card-head">
+            <h2 className="dash-card-title">Your Expenses</h2>
+            <p className="dash-card-subtitle">Filter, update, and review transaction history.</p>
+          </div>
+
+          <form className="dash-filter-grid" onSubmit={onApplyExpenseFilters}>
+            <input
+              className="dash-input"
+              name="category"
+              placeholder="Filter by category"
+              value={expenseFilters.category}
+              onChange={onExpenseFilterChange}
+            />
+            <input
+              className="dash-input"
+              name="month"
+              type="number"
+              min="1"
+              max="12"
+              placeholder="Month (1-12)"
+              value={expenseFilters.month}
+              onChange={onExpenseFilterChange}
+            />
+            <input
+              className="dash-input"
+              name="year"
+              type="number"
+              min="2000"
+              placeholder="Year"
+              value={expenseFilters.year}
+              onChange={onExpenseFilterChange}
+            />
+            <button className="dash-btn dash-btn-primary" type="submit">
+              Apply Filters
+            </button>
+            <button className="dash-btn dash-btn-ghost" type="button" onClick={onClearExpenseFilters}>
+              Clear Filters
+            </button>
+          </form>
+
+          {expenseLoading ? <p className="dash-msg">Loading expenses...</p> : null}
+          {!expenseLoading && expenses.length === 0 ? (
+            <p className="dash-msg">No expenses found for current criteria.</p>
+          ) : null}
+
+          {!expenseLoading && expenses.length > 0 ? (
+            <>
+              <div className="dash-kpi-row">
+                <p>
+                  Page Total: <strong>{total.toFixed(2)}</strong>
+                </p>
+                <p>
+                  Records: <strong>{totalElements}</strong>
+                </p>
+              </div>
+
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Category</th>
+                      <th>Description</th>
+                      <th>Amount</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenses.map((expense) => {
+                      const isEditing = editingExpenseId === expense.id;
+                      return (
+                        <tr key={expense.id}>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                className="dash-input"
+                                name="expenseDate"
+                                type="date"
+                                value={editExpenseForm.expenseDate}
+                                onChange={onEditExpenseChange}
+                              />
+                            ) : (
+                              expense.expenseDate
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                className="dash-input"
+                                name="category"
+                                value={editExpenseForm.category}
+                                onChange={onEditExpenseChange}
+                              />
+                            ) : (
+                              expense.category || "-"
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                className="dash-input"
+                                name="description"
+                                value={editExpenseForm.description}
+                                onChange={onEditExpenseChange}
+                              />
+                            ) : (
+                              expense.description || "-"
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                className="dash-input"
+                                name="amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editExpenseForm.amount}
+                                onChange={onEditExpenseChange}
+                              />
+                            ) : (
+                              expense.amount
+                            )}
+                          </td>
+                          <td>
+                            <div className="dash-row-actions">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    className="dash-btn dash-btn-primary"
+                                    type="button"
+                                    disabled={isUpdatingExpense}
+                                    onClick={() => onSaveExpenseEdit(expense.id)}
+                                  >
+                                    {isUpdatingExpense ? "Saving..." : "Save"}
+                                  </button>
+                                  <button
+                                    className="dash-btn dash-btn-ghost"
+                                    type="button"
+                                    onClick={onCancelExpenseEdit}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    className="dash-btn dash-btn-ghost"
+                                    type="button"
+                                    onClick={() => onStartExpenseEdit(expense)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="dash-btn dash-btn-danger"
+                                    type="button"
+                                    disabled={deletingExpenseId === expense.id}
+                                    onClick={() => onDeleteExpense(expense.id)}
+                                  >
+                                    {deletingExpenseId === expense.id ? "Deleting..." : "Delete"}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="dash-pagination">
+                <button
+                  className="dash-btn dash-btn-ghost"
+                  type="button"
+                  disabled={expenseLoading || currentPage <= 0}
+                  onClick={() => onChangePage(currentPage - 1)}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <button
+                  className="dash-btn dash-btn-ghost"
+                  type="button"
+                  disabled={expenseLoading || currentPage >= totalPages - 1}
+                  onClick={() => onChangePage(currentPage + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 }

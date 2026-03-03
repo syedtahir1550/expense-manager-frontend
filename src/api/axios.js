@@ -18,4 +18,26 @@ instance.interceptors.request.use((config) => {
   return config;
 });
 
+let redirectingToLogin = false;
+
+instance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = error?.config?.url || "";
+    const isAuthRequest = url.includes("/api/auth/login");
+
+    if ((status === 401 || status === 403) && !isAuthRequest) {
+      localStorage.removeItem("token");
+
+      if (!redirectingToLogin) {
+        redirectingToLogin = true;
+        window.location.href = "/login?reason=session_expired";
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export default instance;

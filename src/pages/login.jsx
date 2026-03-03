@@ -1,12 +1,21 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const sessionMessage = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("reason") === "session_expired") {
+      return "Your session expired or is invalid. Please login again.";
+    }
+    return "";
+  }, [location.search]);
 
   const handleLogin = async () => {
     try {
@@ -41,6 +50,10 @@ function Login() {
   return (
     <div style={{ padding: 40 }}>
       <h1>Expense Manager Login</h1>
+
+      {sessionMessage ? (
+        <p style={{ color: "darkorange", marginTop: 0 }}>{sessionMessage}</p>
+      ) : null}
 
       <input
         placeholder="Email"

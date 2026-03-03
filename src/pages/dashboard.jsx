@@ -61,6 +61,12 @@ const buildExpenseQueryParams = (filters, page) => {
   return params;
 };
 
+const sumExpenseAmounts = (items) =>
+  items.reduce((sum, item) => {
+    const amount = Number(item.amount);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
 function Dashboard() {
   const navigate = useNavigate();
 
@@ -83,15 +89,21 @@ function Dashboard() {
   const [budgetSubmitting, setBudgetSubmitting] = useState(false);
   const [budgetError, setBudgetError] = useState("");
   const [budgetForm, setBudgetForm] = useState(initialBudgetForm);
+  const [monthlySpent, setMonthlySpent] = useState(0);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState("");
 
   const total = useMemo(
-    () =>
-      expenses.reduce((sum, expense) => {
-        const amount = Number(expense.amount);
-        return sum + (Number.isFinite(amount) ? amount : 0);
-      }, 0),
+    () => sumExpenseAmounts(expenses),
     [expenses]
   );
+
+  const monthlyBudgetValue = Number(budget?.monthlyBudget);
+  const hasValidBudget = Number.isFinite(monthlyBudgetValue) && monthlyBudgetValue > 0;
+  const remainingBudget = hasValidBudget ? monthlyBudgetValue - monthlySpent : null;
+  const utilization = hasValidBudget ? (monthlySpent / monthlyBudgetValue) * 100 : null;
+  const utilizationColor =
+    utilization >= 100 ? "crimson" : utilization >= 80 ? "darkorange" : "green";
 
   const loadExpenses = async (page = 0, filters = expenseFilters) => {
     try {
@@ -128,6 +140,7 @@ function Dashboard() {
       const res = await getCurrentBudget();
       setBudget(res.data ?? null);
       if (res.data) {
+        setInsightsError("");
         setBudgetForm({
           monthlyIncome: res.data.monthlyIncome ?? "",
           totalEmi: res.data.totalEmi ?? "",
@@ -135,16 +148,63 @@ function Dashboard() {
           month: res.data.month ?? currentMonth,
           year: res.data.year ?? currentYear,
         });
+        await loadMonthlySpent(res.data.month, res.data.year);
       }
     } catch (err) {
       if (err.response?.status === 404) {
         setBudget(null);
+        setMonthlySpent(0);
+        setInsightsError("");
       } else {
         setBudgetError(getErrorText("Unable to load current budget", err));
       }
       console.error(err);
     } finally {
       setBudgetLoading(false);
+    }
+  };
+
+  const loadMonthlySpent = async (month, year) => {
+    if (!month || !year) {
+      setMonthlySpent(0);
+      setInsightsError("");
+      return;
+    }
+
+    try {
+      setInsightsLoading(true);
+      setInsightsError("");
+
+      let page = 0;
+      let totalPagesFromApi = 1;
+      let aggregated = 0;
+
+      while (page < totalPagesFromApi) {
+        const res = await getExpenses({
+          month,
+          year,
+          page,
+          size: 100,
+        });
+        const data = res.data;
+
+        if (Array.isArray(data)) {
+          aggregated = sumExpenseAmounts(data);
+          break;
+        }
+
+        const pageItems = data?.content ?? [];
+        aggregated += sumExpenseAmounts(pageItems);
+        totalPagesFromApi = data?.totalPages ?? 1;
+        page += 1;
+      }
+
+      setMonthlySpent(aggregated);
+    } catch (err) {
+      setInsightsError(getErrorText("Unable to calculate spending insights", err));
+      console.error(err);
+    } finally {
+      setInsightsLoading(false);
     }
   };
 
@@ -196,6 +256,9 @@ function Dashboard() {
         expenseDate: new Date().toISOString().slice(0, 10),
       });
       await loadExpenses(0, expenseFilters);
+      if (budget) {
+        await loadMonthlySpent(budget.month, budget.year);
+      }
     } catch (err) {
       setExpenseError(getErrorText("Unable to create expense", err));
       console.error(err);
@@ -236,6 +299,9 @@ function Dashboard() {
       });
       onCancelExpenseEdit();
       await loadExpenses(currentPage, expenseFilters);
+      if (budget) {
+        await loadMonthlySpent(budget.month, budget.year);
+      }
     } catch (err) {
       setExpenseError(getErrorText("Unable to update expense", err));
       console.error(err);
@@ -260,6 +326,9 @@ function Dashboard() {
 
       const nextPage = expenses.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage;
       await loadExpenses(nextPage, expenseFilters);
+      if (budget) {
+        await loadMonthlySpent(budget.month, budget.year);
+      }
     } catch (err) {
       setExpenseError(getErrorText("Unable to delete expense", err));
       console.error(err);
@@ -305,6 +374,9 @@ function Dashboard() {
       };
       const res = await createOrUpdateBudget(payload);
       setBudget(res.data ?? null);
+      if (res.data) {
+        await loadMonthlySpent(res.data.month, res.data.year);
+      }
     } catch (err) {
       setBudgetError(getErrorText("Unable to save budget", err));
       console.error(err);
@@ -411,6 +483,24 @@ function Dashboard() {
                 {budget.month}/{budget.year}
               </strong>
             </p>
+
+            {insightsLoading ? <p>Updating spending insights...</p> : null}
+            {insightsError ? <p style={{ color: "crimson" }}>{insightsError}</p> : null}
+            {!insightsLoading && !insightsError ? (
+              <>
+                <p>
+                  Spent This Month: <strong>{monthlySpent.toFixed(2)}</strong>
+                </p>
+                <p>
+                  Remaining Budget:{" "}
+                  <strong>{remainingBudget !== null ? remainingBudget.toFixed(2) : "-"}</strong>
+                </p>
+                <p style={{ color: utilizationColor }}>
+                  Utilization:{" "}
+                  <strong>{utilization !== null ? `${utilization.toFixed(2)}%` : "-"}</strong>
+                </p>
+              </>
+            ) : null}
           </div>
         ) : null}
         {!budgetLoading && !budget ? <p>No budget set for current month.</p> : null}

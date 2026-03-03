@@ -99,11 +99,37 @@ function Dashboard() {
   );
 
   const monthlyBudgetValue = Number(budget?.monthlyBudget);
+  const dailyBudgetValue = Number(budget?.dailyBudget);
   const hasValidBudget = Number.isFinite(monthlyBudgetValue) && monthlyBudgetValue > 0;
+  const hasValidDailyBudget = Number.isFinite(dailyBudgetValue) && dailyBudgetValue >= 0;
   const remainingBudget = hasValidBudget ? monthlyBudgetValue - monthlySpent : null;
   const utilization = hasValidBudget ? (monthlySpent / monthlyBudgetValue) * 100 : null;
   const utilizationColor =
     utilization >= 100 ? "crimson" : utilization >= 80 ? "darkorange" : "green";
+
+  const todayDayOfMonth = today.getDate();
+  const expectedTillToday =
+    hasValidDailyBudget && budget?.month === currentMonth && budget?.year === currentYear
+      ? dailyBudgetValue * todayDayOfMonth
+      : null;
+  const actualTillToday =
+    budget?.month === currentMonth && budget?.year === currentYear ? monthlySpent : null;
+  const deltaTillToday =
+    expectedTillToday !== null && actualTillToday !== null
+      ? expectedTillToday - actualTillToday
+      : null;
+  const deltaColor =
+    deltaTillToday === null
+      ? "inherit"
+      : deltaTillToday > 0
+        ? "green"
+        : deltaTillToday < 0
+          ? "crimson"
+          : "darkorange";
+  const formattedDelta =
+    deltaTillToday === null
+      ? "-"
+      : `${deltaTillToday > 0 ? "+" : ""}${deltaTillToday.toFixed(2)}`;
 
   const loadExpenses = async (page = 0, filters = expenseFilters) => {
     try {
@@ -498,6 +524,17 @@ function Dashboard() {
                 <p style={{ color: utilizationColor }}>
                   Utilization:{" "}
                   <strong>{utilization !== null ? `${utilization.toFixed(2)}%` : "-"}</strong>
+                </p>
+                <p>
+                  Expected Spend Till Day {todayDayOfMonth}:{" "}
+                  <strong>{expectedTillToday !== null ? expectedTillToday.toFixed(2) : "-"}</strong>
+                </p>
+                <p>
+                  Actual Spend Till Today:{" "}
+                  <strong>{actualTillToday !== null ? actualTillToday.toFixed(2) : "-"}</strong>
+                </p>
+                <p style={{ color: deltaColor }}>
+                  Today&apos;s Budget Delta: <strong>{formattedDelta}</strong>
                 </p>
               </>
             ) : null}

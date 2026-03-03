@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
+import "./auth.css";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -17,8 +19,11 @@ function Login() {
     return "";
   }, [location.search]);
 
-  const handleLogin = async () => {
+  const handleLogin = async (event) => {
+    event.preventDefault();
+
     try {
+      setSubmitting(true);
       setError("");
       const res = await login(email, password);
       const rawToken =
@@ -44,43 +49,77 @@ function Login() {
         `Login failed${status ? ` (${status})` : ""}: ${detail}`
       );
       console.error(err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Expense Manager Login</h1>
+    <div className="auth-page">
+      <div className="auth-glow auth-glow-top" />
+      <div className="auth-glow auth-glow-bottom" />
 
-      {sessionMessage ? (
-        <p style={{ color: "darkorange", marginTop: 0 }}>{sessionMessage}</p>
-      ) : null}
+      <div className="auth-card">
+        <div className="auth-brand">
+          <div className="auth-logo">E</div>
+          <div>
+            <p className="auth-brand-name">Expensave</p>
+            <p className="auth-brand-tag">Spend smart. Save more.</p>
+          </div>
+        </div>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+        <h1 className="auth-title">Welcome Back</h1>
+        <p className="auth-subtitle">Sign in to continue tracking your money.</p>
 
-      <br /><br />
+        {sessionMessage ? (
+          <p className="auth-message auth-warning">{sessionMessage}</p>
+        ) : null}
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <form className="auth-form" onSubmit={handleLogin}>
+          <label className="auth-label" htmlFor="login-email">
+            Email
+          </label>
+          <input
+            id="login-email"
+            className="auth-input"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-      <br /><br />
+          <label className="auth-label" htmlFor="login-password">
+            Password
+          </label>
+          <input
+            id="login-password"
+            className="auth-input"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-      <button onClick={handleLogin}>Login</button>
+          <button className="auth-btn auth-btn-primary" type="submit" disabled={submitting}>
+            {submitting ? "Signing in..." : "Login"}
+          </button>
+        </form>
 
-      {error ? (
-        <>
-          <br />
-          <br />
-          <p style={{ color: "crimson", margin: 0 }}>{error}</p>
-        </>
-      ) : null}
+        <p className="auth-footnote">
+          New here?{" "}
+          <button
+            type="button"
+            className="auth-link-btn"
+            onClick={() => navigate("/signup")}
+          >
+            Create an account
+          </button>
+        </p>
+
+        {error ? <p className="auth-message auth-error">{error}</p> : null}
+      </div>
     </div>
   );
 }
